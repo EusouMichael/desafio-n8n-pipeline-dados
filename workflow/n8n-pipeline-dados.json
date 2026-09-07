@@ -1,0 +1,149 @@
+{
+  "name": "Data Quality Pipeline - CSV",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1000, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Blueprint: replace this manual trigger with Google Drive Trigger in the target n8n environment.\nreturn [{ json: { fileId: 'REPLACE_WITH_GOOGLE_DRIVE_FILE_ID', fileName: 'clientes_exemplo.csv' } }];"
+      },
+      "id": "prepare-file",
+      "name": "Prepare File Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const required = ['customer_id','name','email','city','state'];\nconst file = $json;\nreturn [{ json: { ...file, requiredFields: required, validationStatus: 'PENDING' } }];"
+      },
+      "id": "define-schema",
+      "name": "Define Expected Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.fileId}}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      },
+      "id": "file-id-check",
+      "name": "File ID Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, status: 'READY_FOR_DOWNLOAD', note: 'Configure Google Drive download node here.' } }];"
+      },
+      "id": "download-placeholder",
+      "name": "Google Drive Download - Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = items.map(i => i.json);\nconst required = ['customer_id','name','email','city','state'];\nconst seen = new Set();\nconst valid = [];\nconst invalid = [];\nfor (let index = 0; index < rows.length; index++) {\n  const row = rows[index];\n  const errors = [];\n  for (const field of required) if (row[field] === undefined || row[field] === null || String(row[field]).trim() === '') errors.push(`${field}: required`);\n  const key = row.customer_id ? String(row.customer_id).trim() : '';\n  if (key && seen.has(key)) errors.push('customer_id: duplicate');\n  if (key) seen.add(key);\n  if (errors.length) invalid.push({ row_number: index + 2, ...row, validation_errors: errors });\n  else valid.push(row);\n}\nreturn [{ json: { total_records: rows.length, valid_records: valid.length, invalid_records: invalid.length, duplicate_records: invalid.filter(r => r.validation_errors.includes('customer_id: duplicate')).length, valid, invalid } }];"
+      },
+      "id": "validate-data",
+      "name": "Validate and Classify Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json;\nreturn [{ json: { total_records: d.total_records, valid_records: d.valid_records, invalid_records: d.invalid_records, duplicate_records: d.duplicate_records, status: d.invalid_records ? 'PROCESSED_WITH_ISSUES' : 'PROCESSED', quality_summary_input: `Total: ${d.total_records}; valid: ${d.valid_records}; invalid: ${d.invalid_records}; duplicates: ${d.duplicate_records}.` } }];"
+      },
+      "id": "build-summary",
+      "name": "Build Quality Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure the PostgreSQL node in the target environment using sql/schema.sql.\nreturn [{ json: { ...$json, persistence: 'POSTGRESQL_CONFIGURATION_REQUIRED' } }];"
+      },
+      "id": "postgres-placeholder",
+      "name": "PostgreSQL - Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, ai_prompt: `Analise o seguinte resumo de qualidade de dados e produza um diagnóstico operacional curto, sem inventar informações: ${$json.quality_summary_input}` } }];"
+      },
+      "id": "ai-input",
+      "name": "Prepare AI Quality Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure the OpenAI node in the target environment.\nreturn [{ json: { ...$json, ai_status: 'OPENAI_CONFIGURATION_REQUIRED' } }];"
+      },
+      "id": "openai-placeholder",
+      "name": "OpenAI - Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, email_subject: `[Data Pipeline] ${$json.status}`, email_body: `Arquivo processado. Total: ${$json.total_records}. Válidos: ${$json.valid_records}. Inválidos: ${$json.invalid_records}. Duplicados: ${$json.duplicate_records}.` } }];"
+      },
+      "id": "notification",
+      "name": "Prepare Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1420, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure Gmail node with the target recipient.\nreturn [{ json: { ...$json, gmail_status: 'GMAIL_CONFIGURATION_REQUIRED' } }];"
+      },
+      "id": "gmail-placeholder",
+      "name": "Gmail - Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1660, -80]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{"node": "Prepare File Metadata", "type": "main", "index": 0}]] },
+    "Prepare File Metadata": { "main": [[{"node": "Define Expected Schema", "type": "main", "index": 0}]] },
+    "Define Expected Schema": { "main": [[{"node": "File ID Available?", "type": "main", "index": 0}]] },
+    "File ID Available?": { "main": [[{"node": "Google Drive Download - Configure", "type": "main", "index": 0}], [{"node": "Build Quality Summary", "type": "main", "index": 0}]] },
+    "Google Drive Download - Configure": { "main": [[{"node": "Validate and Classify Records", "type": "main", "index": 0}]] },
+    "Validate and Classify Records": { "main": [[{"node": "Build Quality Summary", "type": "main", "index": 0}]] },
+    "Build Quality Summary": { "main": [[{"node": "PostgreSQL - Configure", "type": "main", "index": 0}]] },
+    "PostgreSQL - Configure": { "main": [[{"node": "Prepare AI Quality Prompt", "type": "main", "index": 0}]] },
+    "Prepare AI Quality Prompt": { "main": [[{"node": "OpenAI - Configure", "type": "main", "index": 0}]] },
+    "OpenAI - Configure": { "main": [[{"node": "Prepare Notification", "type": "main", "index": 0}]] },
+    "Prepare Notification": { "main": [[{"node": "Gmail - Configure", "type": "main", "index": 0}]] }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
