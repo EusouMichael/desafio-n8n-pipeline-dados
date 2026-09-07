@@ -1,0 +1,7 @@
+customer_id,name,email,city,state
+C001,Ana Souza,ana.souza@example.com,Brasilia,DF
+C002,Bruno Lima,bruno.lima@example.com,Goiania,GO
+C003,Carlos Mendes,,Sao Paulo,SP
+C004,Daniela Alves,daniela.alves@example.com,Recife,PE
+C002,Bruno Lima,bruno.lima@example.com,Goiania,GO
+C005,Elisa Rocha,elisa.rocha@example.com,Curitiba,PR
